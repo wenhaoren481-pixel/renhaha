@@ -11,19 +11,18 @@ import dayjs from 'dayjs';
 
 export default function Orders() {
   const navigate = useNavigate();
-  const { orders, deleteOrder, searchOrder } = useOrders();
-  // generateOrderId is available for future use
+  const { orders, deleteOrder } = useOrders();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSearch = () => {
-    if (!searchQuery.trim()) return;
-    const order = searchOrder(searchQuery.trim());
-    if (order) {
-      navigate(`/orders/${order.id}`);
-    } else {
-      toast.error('未找到该订单');
-    }
-  };
+  // 模糊搜索订单
+  const filteredOrders = searchQuery.trim()
+    ? orders.filter(order => 
+        order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (order.logo && order.logo.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        order.productName.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : orders;
 
   const handleDelete = (id: string) => {
     if (confirm('确定要删除这个订单吗？')) {
@@ -52,7 +51,8 @@ export default function Orders() {
     return dayjs().isAfter(dayjs(order.deliveryDate));
   };
 
-  const sortedOrders = [...orders].sort((a, b) => 
+  // 排序并过滤后的订单列表
+  const sortedOrders = [...filteredOrders].sort((a, b) => 
     dayjs(b.createdAt).valueOf() - dayjs(a.createdAt).valueOf()
   );
 
@@ -75,20 +75,14 @@ export default function Orders() {
       {/* 搜索栏 */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <Input
-                placeholder="输入订单号搜索（如：188003）"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10"
-              />
-            </div>
-            <Button onClick={handleSearch} variant="outline">
-              搜索
-            </Button>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Input
+              placeholder="搜索订单号、客户、Logo、产品..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
         </CardContent>
       </Card>
@@ -122,7 +116,9 @@ export default function Orders() {
                     <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-medium">{order.id}</span>
+                          <span className="font-mono font-medium">
+                            {order.id}{order.logo ? `-${order.logo}` : ''}
+                          </span>
                           {isOverdue(order) && (
                             <span title="已超期"><AlertCircle className="w-4 h-4 text-red-500" /></span>
                           )}
