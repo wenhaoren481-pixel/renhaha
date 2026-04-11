@@ -219,10 +219,9 @@ export function useOrders() {
     localStorage.setItem(ORDERS_KEY, JSON.stringify(newOrders));
   };
 
-  const addOrder = (order: Omit<Order, 'id' | 'createdAt'>) => {
+  const addOrder = (order: Omit<Order, 'createdAt'>) => {
     const newOrder: Order = {
       ...order,
-      id: '', // 外部传入
       createdAt: new Date().toISOString(),
     };
     const updated = [...orders, newOrder];
