@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import { useProducts, useProcessConfigs, useOrders, useOrderCounter, useShops } from '@/hooks/useData';
-import type { OrderProcess } from '@/types';
+import type { OrderProcess, Order } from '@/types';
 
 // 拖拽相关
 import {
@@ -281,7 +281,7 @@ export default function OrderCreate() {
     const product = products.find(p => p.id === formData.productId);
     const shop = shops.find(s => s.id === formData.shopId);
 
-    const order = {
+    const order: Order = {
       id: orderId,
       customerName: formData.customerName,
       customerPhone: formData.customerPhone,
@@ -293,11 +293,12 @@ export default function OrderCreate() {
       material: formData.material,
       logo: formData.logo,
       spec: formData.spec,
+      createdAt: new Date().toISOString(),
       orderDate: formData.orderDate,
       deliveryDate: formData.deliveryDate,
       processes: processes,
       currentProcessIndex: 0,
-      status: 'pending' as const,
+      status: 'pending',
       totalPlannedDays: calculateTotalDays(),
       actualSpentDays: 0,
     };
