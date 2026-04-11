@@ -53,11 +53,15 @@ export interface Order {
   customerAddress: string;
   productId: string;
   productName: string;
+  shopId?: string;
+  shopName?: string;
   material: string;
   logo: string;
+  spec?: string;
   
   // 时间相关
   createdAt: string;
+  orderDate?: string;
   deliveryDate: string;
   
   // 工序流程
