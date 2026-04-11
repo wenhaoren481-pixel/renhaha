@@ -1,1 +1,1 @@
-{"version": "2.0.2", "name": "订单生产管理系统", "description": "添加店铺选择、规格字段、下单日期", "releaseDate": "2025-04-11"}
+{"version": "2.0.3", "name": "订单生产管理系统", "description": "订单号显示格式优化，支持模糊搜索", "releaseDate": "2025-04-11"}
