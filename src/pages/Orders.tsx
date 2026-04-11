@@ -121,7 +121,7 @@ export default function Orders() {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-medium">
-                            {order.id}{order.logo ? `-${order.logo}` : ''}
+                            {order.id || '未分配'}{order.logo ? `-${order.logo}` : ''}
                           </span>
                           {isOverdue(order) && (
                             <span title="已超期"><AlertCircle className="w-4 h-4 text-red-500" /></span>
@@ -166,11 +166,14 @@ export default function Orders() {
                         {getStatusBadge(order.status)}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => navigate(`/orders/${order.id}`)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/orders/${order.id}`);
+                            }}
                             title="查看详情"
                           >
                             <Eye className="w-4 h-4" />
@@ -178,7 +181,10 @@ export default function Orders() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleDelete(order.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(order.id);
+                            }}
                             title="删除"
                           >
                             <Trash2 className="w-4 h-4" />
