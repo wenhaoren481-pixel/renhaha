@@ -1,22 +1,59 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Pause, CheckCircle, RotateCcw, Clock, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Play, Pause, CheckCircle, RotateCcw, Clock, AlertCircle, Edit2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { useOrders } from '@/hooks/useData';
+import { useOrders, useProducts, useShops } from '@/hooks/useData';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
-// OrderProcess type is used implicitly
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { orders, updateOrder } = useOrders();
+  const { products } = useProducts();
+  const { shops } = useShops();
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+  
+  // 编辑表单数据
+  const [editData, setEditData] = useState({
+    customerName: '',
+    customerPhone: '',
+    customerAddress: '',
+    productId: '',
+    shopId: '',
+    material: '',
+    logo: '',
+    spec: '',
+    orderDate: '',
+    deliveryDate: '',
+  });
 
   const order = orders.find(o => o.id === id);
+
+  // 初始化编辑数据
+  useEffect(() => {
+    if (order) {
+      setEditData({
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        customerAddress: order.customerAddress,
+        productId: order.productId,
+        shopId: order.shopId || '',
+        material: order.material,
+        logo: order.logo,
+        spec: order.spec || '',
+        orderDate: order.orderDate || dayjs(order.createdAt).format('YYYY-MM-DD'),
+        deliveryDate: order.deliveryDate,
+      });
+    }
+  }, [order]);
 
   // 计算当前工序已用时间（秒）
   useEffect(() => {
@@ -50,6 +87,47 @@ export default function OrderDetail() {
   const isLastProcess = order.currentProcessIndex >= order.processes.length - 1;
   const isOverdue = dayjs().isAfter(dayjs(order.deliveryDate)) && order.status !== 'completed';
 
+  // 保存编辑
+  const handleSave = () => {
+    const product = products.find(p => p.id === editData.productId);
+    const shop = shops.find(s => s.id === editData.shopId);
+    
+    updateOrder(order.id, {
+      customerName: editData.customerName,
+      customerPhone: editData.customerPhone,
+      customerAddress: editData.customerAddress,
+      productId: editData.productId,
+      productName: product?.name || order.productName,
+      shopId: editData.shopId,
+      shopName: shop?.name || order.shopName,
+      material: editData.material,
+      logo: editData.logo,
+      spec: editData.spec,
+      orderDate: editData.orderDate,
+      deliveryDate: editData.deliveryDate,
+    });
+    
+    setIsEditing(false);
+    toast.success('订单已更新');
+  };
+
+  // 取消编辑
+  const handleCancel = () => {
+    setEditData({
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerAddress: order.customerAddress,
+      productId: order.productId,
+      shopId: order.shopId || '',
+      material: order.material,
+      logo: order.logo,
+      spec: order.spec || '',
+      orderDate: order.orderDate || dayjs(order.createdAt).format('YYYY-MM-DD'),
+      deliveryDate: order.deliveryDate,
+    });
+    setIsEditing(false);
+  };
+
   // 开始生产
   const handleStart = () => {
     const updatedProcesses = [...order.processes];
@@ -73,7 +151,6 @@ export default function OrderDetail() {
     const updatedProcesses = [...order.processes];
     
     if (currentProcess.status === 'running') {
-      // 暂停
       const elapsed = dayjs().diff(dayjs(currentProcess.startedAt), 'hour');
       updatedProcesses[order.currentProcessIndex] = {
         ...currentProcess,
@@ -84,7 +161,6 @@ export default function OrderDetail() {
       updateOrder(order.id, { status: 'paused', processes: updatedProcesses });
       toast.success('已暂停');
     } else if (currentProcess.status === 'paused') {
-      // 继续
       updatedProcesses[order.currentProcessIndex] = {
         ...currentProcess,
         status: 'running',
@@ -110,7 +186,6 @@ export default function OrderDetail() {
     };
 
     if (isLastProcess) {
-      // 最后一道，订单完成
       updateOrder(order.id, {
         status: 'completed',
         processes: updatedProcesses,
@@ -118,7 +193,6 @@ export default function OrderDetail() {
       });
       toast.success('订单生产完成！');
     } else {
-      // 开始下一道
       updatedProcesses[order.currentProcessIndex + 1] = {
         ...updatedProcesses[order.currentProcessIndex + 1],
         status: 'running',
@@ -142,7 +216,6 @@ export default function OrderDetail() {
 
     const updatedProcesses = [...order.processes];
     
-    // 当前工序重置
     if (currentProcess) {
       updatedProcesses[order.currentProcessIndex] = {
         ...currentProcess,
@@ -153,7 +226,6 @@ export default function OrderDetail() {
       };
     }
 
-    // 上一道工序重新开始
     updatedProcesses[order.currentProcessIndex - 1] = {
       ...updatedProcesses[order.currentProcessIndex - 1],
       status: 'running',
@@ -194,7 +266,9 @@ export default function OrderDetail() {
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900">订单详情</h1>
-            <span className="font-mono text-lg text-blue-600">{order.id}</span>
+            <span className="font-mono text-lg text-blue-600">
+              {order.id}{order.logo ? `-${order.logo}` : ''}
+            </span>
             {isOverdue && (
               <Badge variant="destructive" className="flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />
@@ -203,6 +277,36 @@ export default function OrderDetail() {
             )}
           </div>
         </div>
+        {/* 编辑按钮 */}
+        {!isEditing && (
+          <Button 
+            variant="outline" 
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-2"
+          >
+            <Edit2 className="w-4 h-4" />
+            编辑订单
+          </Button>
+        )}
+        {isEditing && (
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleSave}
+              className="bg-green-500 hover:bg-green-600 flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              保存
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleCancel}
+              className="flex items-center gap-2"
+            >
+              <X className="w-4 h-4" />
+              取消
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 进度条 */}
@@ -219,70 +323,200 @@ export default function OrderDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 左侧：基本信息 */}
         <div className="space-y-6">
+          {/* 客户信息 */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">客户信息</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <span className="text-gray-500 text-sm">姓名</span>
-                <p className="font-medium">{order.customerName}</p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">电话</span>
-                <p>{order.customerPhone}</p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">地址</span>
-                <p>{order.customerAddress || '-'}</p>
-              </div>
+              {isEditing ? (
+                <>
+                  <div>
+                    <Label>姓名</Label>
+                    <Input
+                      value={editData.customerName}
+                      onChange={(e) => setEditData({ ...editData, customerName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>电话</Label>
+                    <Input
+                      value={editData.customerPhone}
+                      onChange={(e) => setEditData({ ...editData, customerPhone: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>地址</Label>
+                    <Input
+                      value={editData.customerAddress}
+                      onChange={(e) => setEditData({ ...editData, customerAddress: e.target.value })}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <span className="text-gray-500 text-sm">姓名</span>
+                    <p className="font-medium">{order.customerName}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-sm">电话</span>
+                    <p>{order.customerPhone}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-sm">地址</span>
+                    <p>{order.customerAddress || '-'}</p>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
+          {/* 产品信息 */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">产品信息</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <span className="text-gray-500 text-sm">产品</span>
-                <p className="font-medium">{order.productName}</p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">材质</span>
-                <p>{order.material || '-'}</p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">Logo</span>
-                <p>{order.logo || '-'}</p>
-              </div>
+              {isEditing ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>产品</Label>
+                      <Select
+                        value={editData.productId}
+                        onValueChange={(value) => setEditData({ ...editData, productId: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>店铺</Label>
+                      <Select
+                        value={editData.shopId}
+                        onValueChange={(value) => setEditData({ ...editData, shopId: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择店铺" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {shops.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label>材质</Label>
+                      <Input
+                        value={editData.material}
+                        onChange={(e) => setEditData({ ...editData, material: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Logo</Label>
+                      <Input
+                        value={editData.logo}
+                        onChange={(e) => setEditData({ ...editData, logo: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>规格</Label>
+                      <Input
+                        value={editData.spec}
+                        onChange={(e) => setEditData({ ...editData, spec: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <span className="text-gray-500 text-sm">产品</span>
+                    <p className="font-medium">{order.productName}</p>
+                  </div>
+                  {order.shopName && (
+                    <div>
+                      <span className="text-gray-500 text-sm">店铺</span>
+                      <p>{order.shopName}</p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-gray-500 text-sm">材质</span>
+                    <p>{order.material || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-sm">Logo</span>
+                    <p>{order.logo || '-'}</p>
+                  </div>
+                  {order.spec && (
+                    <div>
+                      <span className="text-gray-500 text-sm">规格</span>
+                      <p>{order.spec}</p>
+                    </div>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 
+          {/* 时间信息 */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">时间信息</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <span className="text-gray-500 text-sm">创建日期</span>
-                <p>{dayjs(order.createdAt).format('YYYY-MM-DD HH:mm')}</p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">发货日期</span>
-                <p className={isOverdue ? 'text-red-500 font-medium' : ''}>
-                  {dayjs(order.deliveryDate).format('YYYY-MM-DD')}
-                </p>
-              </div>
-              <div>
-                <span className="text-gray-500 text-sm">预计周期</span>
-                <p>{order.totalPlannedDays} 天</p>
-              </div>
-              {order.status === 'completed' && (
-                <div>
-                  <span className="text-gray-500 text-sm">实际用时</span>
-                  <p>{order.actualSpentDays} 天</p>
+              {isEditing ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>下单日期</Label>
+                    <Input
+                      type="date"
+                      value={editData.orderDate}
+                      onChange={(e) => setEditData({ ...editData, orderDate: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>发货日期</Label>
+                    <Input
+                      type="date"
+                      value={editData.deliveryDate}
+                      onChange={(e) => setEditData({ ...editData, deliveryDate: e.target.value })}
+                    />
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div>
+                    <span className="text-gray-500 text-sm">下单日期</span>
+                    <p>{order.orderDate || dayjs(order.createdAt).format('YYYY-MM-DD')}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-sm">发货日期</span>
+                    <p className={isOverdue ? 'text-red-500 font-medium' : ''}>
+                      {order.deliveryDate}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-sm">预计周期</span>
+                    <p>{order.totalPlannedDays} 天</p>
+                  </div>
+                  {order.status === 'completed' && (
+                    <div>
+                      <span className="text-gray-500 text-sm">实际用时</span>
+                      <p>{order.actualSpentDays} 天</p>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
@@ -293,13 +527,13 @@ export default function OrderDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">工序流程</CardTitle>
-              {order.status === 'pending' && (
+              {!isEditing && order.status === 'pending' && (
                 <Button onClick={handleStart} className="bg-green-500 hover:bg-green-600">
                   <Play className="w-4 h-4 mr-2" />
                   开始生产
                 </Button>
               )}
-              {order.status === 'processing' && currentProcess?.status === 'running' && (
+              {!isEditing && order.status === 'processing' && currentProcess?.status === 'running' && (
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={handlePauseResume}>
                     <Pause className="w-4 h-4 mr-2" />
@@ -311,7 +545,7 @@ export default function OrderDetail() {
                   </Button>
                 </div>
               )}
-              {order.status === 'paused' && (
+              {!isEditing && order.status === 'paused' && (
                 <div className="flex gap-2">
                   <Button onClick={handlePauseResume} className="bg-blue-500 hover:bg-blue-600">
                     <Play className="w-4 h-4 mr-2" />
@@ -338,7 +572,6 @@ export default function OrderDetail() {
                     }`}
                   >
                     <div className="flex items-center gap-4">
-                      {/* 序号 */}
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                         process.status === 'completed'
                           ? 'bg-green-500 text-white'
@@ -353,7 +586,6 @@ export default function OrderDetail() {
                         )}
                       </div>
 
-                      {/* 工序信息 */}
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{process.processName}</span>
@@ -368,7 +600,6 @@ export default function OrderDetail() {
                         </p>
                       </div>
 
-                      {/* 计时显示 */}
                       {index === order.currentProcessIndex && 
                        order.status !== 'completed' && 
                        process.status === 'running' && (
@@ -380,7 +611,6 @@ export default function OrderDetail() {
                         </div>
                       )}
 
-                      {/* 实际用时 */}
                       {process.status === 'completed' && process.actualDuration && (
                         <div className="text-sm text-green-600">
                           实际 {Math.round(process.actualDuration * 10) / 10} 小时
