@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
-import { useProducts, useProcessConfigs, useOrders, useOrderCounter } from '@/hooks/useData';
+import { useProducts, useProcessConfigs, useOrders, useOrderCounter, useShops } from '@/hooks/useData';
 import type { OrderProcess } from '@/types';
 
 // 拖拽相关
@@ -107,6 +107,7 @@ function SortableProcessItem({
 export default function OrderCreate() {
   const navigate = useNavigate();
   const { products } = useProducts();
+  const { shops } = useShops();
   const { processConfigs } = useProcessConfigs();
   const { addOrder } = useOrders();
   const { generateOrderId } = useOrderCounter();
@@ -117,8 +118,11 @@ export default function OrderCreate() {
     customerPhone: '',
     customerAddress: '',
     productId: '',
+    shopId: '',
     material: '',
     logo: '',
+    spec: '',
+    orderDate: dayjs().format('YYYY-MM-DD'),
     deliveryDate: dayjs().add(7, 'day').format('YYYY-MM-DD'),
   });
   const [processes, setProcesses] = useState<OrderProcess[]>([]);
@@ -275,6 +279,7 @@ export default function OrderCreate() {
     }
 
     const product = products.find(p => p.id === formData.productId);
+    const shop = shops.find(s => s.id === formData.shopId);
 
     const order = {
       id: orderId,
@@ -283,9 +288,12 @@ export default function OrderCreate() {
       customerAddress: formData.customerAddress,
       productId: formData.productId,
       productName: product?.name || '',
+      shopId: formData.shopId,
+      shopName: shop?.name || '',
       material: formData.material,
       logo: formData.logo,
-      createdAt: new Date().toISOString(),
+      spec: formData.spec,
+      orderDate: formData.orderDate,
       deliveryDate: formData.deliveryDate,
       processes: processes,
       currentProcessIndex: 0,
@@ -393,58 +401,107 @@ export default function OrderCreate() {
               <CardTitle className="text-lg">产品信息</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label>选择产品 <span className="text-red-500">*</span></Label>
-                <Select
-                  value={formData.productId}
-                  onValueChange={(value) => setFormData({ ...formData, productId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="请选择产品" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* 产品和店铺 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>选择产品 <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.productId}
+                    onValueChange={(value) => setFormData({ ...formData, productId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="请选择产品" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>选择店铺</Label>
+                  <Select
+                    value={formData.shopId}
+                    onValueChange={(value) => setFormData({ ...formData, shopId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="请选择店铺" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shops.map((shop) => (
+                        <SelectItem key={shop.id} value={shop.id}>
+                          {shop.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label>材质</Label>
-                <Input
-                  value={formData.material}
-                  onChange={(e) => setFormData({ ...formData, material: e.target.value })}
-                  placeholder="如：250g铜版纸"
-                />
-              </div>
-              <div>
-                <Label>Logo</Label>
-                <Input
-                  value={formData.logo}
-                  onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                  placeholder="Logo信息"
-                />
+              
+              {/* 材质、Logo、规格 */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label>材质</Label>
+                  <Input
+                    value={formData.material}
+                    onChange={(e) => setFormData({ ...formData, material: e.target.value })}
+                    placeholder="如：250g铜版纸"
+                  />
+                </div>
+                <div>
+                  <Label>Logo</Label>
+                  <Input
+                    value={formData.logo}
+                    onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
+                    placeholder="Logo信息"
+                  />
+                </div>
+                <div>
+                  <Label>规格 (mm)</Label>
+                  <Input
+                    value={formData.spec}
+                    onChange={(e) => setFormData({ ...formData, spec: e.target.value })}
+                    placeholder="如：100*80*50"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* 发货日期 */}
+          {/* 日期信息 */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">发货日期</CardTitle>
+              <CardTitle className="text-lg">日期信息</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-gray-400" />
-                <Input
-                  type="date"
-                  value={formData.deliveryDate}
-                  onChange={(e) => setFormData({ ...formData, deliveryDate: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>下单日期</Label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-gray-400" />
+                    <Input
+                      type="date"
+                      value={formData.orderDate}
+                      onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>发货日期</Label>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-gray-400" />
+                    <Input
+                      type="date"
+                      value={formData.deliveryDate}
+                      onChange={(e) => setFormData({ ...formData, deliveryDate: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-gray-500 mt-4">
                 预计生产周期：{calculateTotalDays()} 天
               </p>
             </CardContent>
