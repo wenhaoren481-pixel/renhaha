@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, Pause, CheckCircle, RotateCcw, Clock, AlertCircle, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, Play, Pause, CheckCircle, RotateCcw, Clock, AlertCircle, Edit2, Save, X, Ban, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,7 @@ export default function OrderDetail() {
   const { shops } = useShops();
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingProcesses, setIsEditingProcesses] = useState(false);
   
   // 编辑表单数据
   const [editData, setEditData] = useState({
@@ -126,6 +127,69 @@ export default function OrderDetail() {
       deliveryDate: order.deliveryDate,
     });
     setIsEditing(false);
+  };
+
+  // 取消某道工序（跳过它）
+  const handleCancelProcess = (processIndex: number) => {
+    const process = order.processes[processIndex];
+    if (!process) return;
+
+    if (!confirm(`确定要取消"${process.processName}"工序吗？\n取消后，该工序及后续工序将重置为未开始状态。`)) {
+      return;
+    }
+
+    const updatedProcesses = [...order.processes];
+    
+    // 取消当前工序（标记为已完成但跳过）
+    updatedProcesses[processIndex] = {
+      ...updatedProcesses[processIndex],
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+      actualDuration: 0,
+      plannedDuration: 0, // 取消的工序时间为0
+    };
+
+    // 后续工序重置为未开始
+    for (let i = processIndex + 1; i < updatedProcesses.length; i++) {
+      updatedProcesses[i] = {
+        ...updatedProcesses[i],
+        status: 'pending',
+        startedAt: undefined,
+        pausedAt: undefined,
+        completedAt: undefined,
+        actualDuration: 0,
+      };
+    }
+
+    // 更新当前工序索引到下一道
+    const newCurrentIndex = processIndex + 1;
+    
+    updateOrder(order.id, {
+      processes: updatedProcesses,
+      currentProcessIndex: newCurrentIndex < updatedProcesses.length ? newCurrentIndex : processIndex,
+      status: newCurrentIndex < updatedProcesses.length ? 'processing' : 'completed',
+    });
+
+    toast.success(`已取消"${process.processName}"工序`);
+  };
+
+  // 更新工序时间
+  const handleUpdateProcessDuration = (processIndex: number, newDuration: number) => {
+    if (newDuration < 0) return;
+    
+    const updatedProcesses = [...order.processes];
+    updatedProcesses[processIndex] = {
+      ...updatedProcesses[processIndex],
+      plannedDuration: newDuration,
+    };
+
+    // 重新计算总预计天数
+    const newTotalDays = updatedProcesses.reduce((sum, p) => sum + p.plannedDuration, 0);
+
+    updateOrder(order.id, {
+      processes: updatedProcesses,
+      totalPlannedDays: newTotalDays,
+    });
   };
 
   // 开始生产
@@ -527,98 +591,173 @@ export default function OrderDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">工序流程</CardTitle>
-              {!isEditing && order.status === 'pending' && (
-                <Button onClick={handleStart} className="bg-green-500 hover:bg-green-600">
-                  <Play className="w-4 h-4 mr-2" />
-                  开始生产
-                </Button>
-              )}
-              {!isEditing && order.status === 'processing' && currentProcess?.status === 'running' && (
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={handlePauseResume}>
-                    <Pause className="w-4 h-4 mr-2" />
-                    暂停
+              <div className="flex gap-2">
+                {/* 编辑工序按钮 */}
+                {!isEditing && !isEditingProcesses && order.status !== 'completed' && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsEditingProcesses(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    编辑工序
                   </Button>
-                  <Button onClick={handleComplete} className="bg-green-500 hover:bg-green-600">
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    {isLastProcess ? '完成订单' : '完成并下一道'}
+                )}
+                {isEditingProcesses && (
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsEditingProcesses(false)}
+                    className="flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    完成编辑
                   </Button>
-                </div>
-              )}
-              {!isEditing && order.status === 'paused' && (
-                <div className="flex gap-2">
-                  <Button onClick={handlePauseResume} className="bg-blue-500 hover:bg-blue-600">
+                )}
+                
+                {/* 生产控制按钮 */}
+                {!isEditing && !isEditingProcesses && order.status === 'pending' && (
+                  <Button onClick={handleStart} className="bg-green-500 hover:bg-green-600">
                     <Play className="w-4 h-4 mr-2" />
-                    继续
+                    开始生产
                   </Button>
-                  <Button variant="outline" onClick={handleGoBack}>
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    退回上一步
-                  </Button>
-                </div>
-              )}
+                )}
+                {!isEditing && !isEditingProcesses && order.status === 'processing' && currentProcess?.status === 'running' && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={handlePauseResume}>
+                      <Pause className="w-4 h-4 mr-2" />
+                      暂停
+                    </Button>
+                    <Button onClick={handleComplete} className="bg-green-500 hover:bg-green-600">
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      {isLastProcess ? '完成订单' : '完成并下一道'}
+                    </Button>
+                  </div>
+                )}
+                {!isEditing && !isEditingProcesses && order.status === 'paused' && (
+                  <div className="flex gap-2">
+                    <Button onClick={handlePauseResume} className="bg-blue-500 hover:bg-blue-600">
+                      <Play className="w-4 h-4 mr-2" />
+                      继续
+                    </Button>
+                    <Button variant="outline" onClick={handleGoBack}>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      退回上一步
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {order.processes.map((process, index) => (
-                  <div
-                    key={process.id}
-                    className={`p-4 rounded-lg border ${
-                      index === order.currentProcessIndex && order.status !== 'completed'
-                        ? 'border-blue-500 bg-blue-50'
-                        : process.status === 'completed'
-                        ? 'border-green-200 bg-green-50'
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        process.status === 'completed'
-                          ? 'bg-green-500 text-white'
-                          : index === order.currentProcessIndex
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 text-gray-500'
-                      }`}>
-                        {process.status === 'completed' ? (
-                          <CheckCircle className="w-4 h-4" />
-                        ) : (
-                          <span className="text-sm font-medium">{index + 1}</span>
-                        )}
-                      </div>
-
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{process.processName}</span>
-                          {index === order.currentProcessIndex && order.status !== 'completed' && (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                              进行中
-                            </Badge>
+                {order.processes.map((process, index) => {
+                  const isCurrent = index === order.currentProcessIndex;
+                  const isCompleted = process.status === 'completed';
+                  const isCanceled = isCompleted && process.plannedDuration === 0;
+                  
+                  return (
+                    <div
+                      key={process.id}
+                      className={`p-4 rounded-lg border ${
+                        isCanceled
+                          ? 'border-gray-300 bg-gray-100'
+                          : isCurrent && order.status !== 'completed'
+                          ? 'border-blue-500 bg-blue-50'
+                          : isCompleted
+                          ? 'border-green-200 bg-green-50'
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        {/* 序号 */}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          isCanceled
+                            ? 'bg-gray-400 text-white'
+                            : isCompleted
+                            ? 'bg-green-500 text-white'
+                            : isCurrent
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 text-gray-500'
+                        }`}>
+                          {isCanceled ? (
+                            <Ban className="w-4 h-4" />
+                          ) : isCompleted ? (
+                            <CheckCircle className="w-4 h-4" />
+                          ) : (
+                            <span className="text-sm font-medium">{index + 1}</span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-500">
-                          {process.factoryName} · 计划 {process.plannedDuration} 天
-                        </p>
+
+                        {/* 工序信息 */}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${isCanceled ? 'text-gray-500 line-through' : ''}`}>
+                              {process.processName}
+                            </span>
+                            {isCanceled && (
+                              <Badge variant="secondary" className="bg-gray-200 text-gray-600">
+                                已取消
+                              </Badge>
+                            )}
+                            {isCurrent && order.status !== 'completed' && !isCanceled && (
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                                进行中
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            {process.factoryName} · 
+                            {isEditingProcesses ? (
+                              <span className="inline-flex items-center gap-1 ml-1">
+                                计划
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={30}
+                                  value={process.plannedDuration}
+                                  onChange={(e) => handleUpdateProcessDuration(index, parseInt(e.target.value) || 0)}
+                                  className="w-16 h-6 text-xs inline-block"
+                                />
+                                天
+                              </span>
+                            ) : (
+                              ` 计划 ${process.plannedDuration} 天`
+                            )}
+                          </p>
+                        </div>
+
+                        {/* 计时显示 */}
+                        {isCurrent && order.status !== 'completed' && process.status === 'running' && (
+                          <div className="flex items-center gap-2 text-blue-600">
+                            <Clock className="w-4 h-4 animate-pulse" />
+                            <span className="font-mono font-medium">
+                              {formatTime(elapsedTime)}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* 实际用时 */}
+                        {isCompleted && !isCanceled && process.actualDuration !== undefined && (
+                          <div className="text-sm text-green-600">
+                            实际 {Math.round(process.actualDuration * 10) / 10} 小时
+                          </div>
+                        )}
+
+                        {/* 取消按钮 - 编辑模式下显示 */}
+                        {isEditingProcesses && !isCanceled && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCancelProcess(index)}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <Ban className="w-4 h-4 mr-1" />
+                            取消
+                          </Button>
+                        )}
                       </div>
-
-                      {index === order.currentProcessIndex && 
-                       order.status !== 'completed' && 
-                       process.status === 'running' && (
-                        <div className="flex items-center gap-2 text-blue-600">
-                          <Clock className="w-4 h-4 animate-pulse" />
-                          <span className="font-mono font-medium">
-                            {formatTime(elapsedTime)}
-                          </span>
-                        </div>
-                      )}
-
-                      {process.status === 'completed' && process.actualDuration && (
-                        <div className="text-sm text-green-600">
-                          实际 {Math.round(process.actualDuration * 10) / 10} 小时
-                        </div>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
