@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, GripVertical, ArrowLeft, Calendar, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ArrowLeft, Calendar, ChevronDown, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -121,6 +122,85 @@ export default function OrderCreate() {
     deliveryDate: dayjs().add(7, 'day').format('YYYY-MM-DD'),
   });
   const [processes, setProcesses] = useState<OrderProcess[]>([]);
+  const [batchInput, setBatchInput] = useState('');
+
+  // 智能解析批量输入的文本
+  const parseBatchInput = () => {
+    if (!batchInput.trim()) {
+      toast.error('请输入需要解析的内容');
+      return;
+    }
+
+    const text = batchInput.trim();
+    
+    // 提取手机号（11位数字，以1开头）
+    const phoneRegex = /1[3-9]\d{9}/;
+    const phoneMatch = text.match(phoneRegex);
+    const phone = phoneMatch ? phoneMatch[0] : '';
+    
+    // 移除手机号后的剩余文本
+    let remainingText = text.replace(phone, '').trim();
+    
+    // 去除常见的分隔符
+    remainingText = remainingText.replace(/[,，\s]+/g, ' ').trim();
+    
+    // 尝试识别地址（包含省、市、区、路、号、栋、单元等关键词）
+    const addressKeywords = ['省', '市', '区', '县', '镇', '乡', '村', '路', '街', '道', '号', '栋', '单元', '楼', '室', '层'];
+    let name = '';
+    let address = '';
+    
+    // 按空格分割
+    const parts = remainingText.split(/\s+/).filter(p => p.length > 0);
+    
+    if (parts.length >= 2) {
+      // 判断哪个部分是地址
+      const part1 = parts[0];
+      const part2 = parts.slice(1).join('');
+      
+      const part1IsAddress = addressKeywords.some(kw => part1.includes(kw));
+      const part2IsAddress = addressKeywords.some(kw => part2.includes(kw));
+      
+      if (part1IsAddress && !part2IsAddress) {
+        // 第一个是地址，第二个是姓名
+        address = part1;
+        name = part2;
+      } else if (!part1IsAddress && part2IsAddress) {
+        // 第一个是姓名，第二个是地址
+        name = part1;
+        address = part2;
+      } else if (part1.length <= 4 && part2.length > 4) {
+        // 短的可能是姓名，长的可能是地址
+        name = part1;
+        address = part2;
+      } else {
+        // 默认：第一个是姓名，后面的是地址
+        name = part1;
+        address = parts.slice(1).join('');
+      }
+    } else if (parts.length === 1) {
+      // 只有一个部分，判断是姓名还是地址
+      const partIsAddress = addressKeywords.some(kw => parts[0].includes(kw));
+      if (partIsAddress) {
+        address = parts[0];
+      } else {
+        name = parts[0];
+      }
+    }
+    
+    // 更新表单
+    setFormData(prev => ({
+      ...prev,
+      customerName: name,
+      customerPhone: phone,
+      customerAddress: address,
+    }));
+    
+    if (name || phone || address) {
+      toast.success('解析成功！');
+    } else {
+      toast.warning('未能识别出有效信息，请检查输入格式');
+    }
+  };
 
   // 生成订单号
   useEffect(() => {
@@ -254,7 +334,33 @@ export default function OrderCreate() {
               <CardTitle className="text-lg">客户信息</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
+              {/* 批量输入 */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <Label className="text-blue-700 flex items-center gap-2">
+                  <Wand2 className="w-4 h-4" />
+                  批量输入（自动解析）
+                </Label>
+                <p className="text-xs text-blue-500 mt-1 mb-2">
+                  粘贴包含姓名、电话、地址的文本，如：张三 13800138000 北京市朝阳区xxx
+                </p>
+                <div className="flex gap-2">
+                  <Textarea
+                    value={batchInput}
+                    onChange={(e) => setBatchInput(e.target.value)}
+                    placeholder="张三 13800138000 北京市朝阳区xxx"
+                    className="flex-1 min-h-[60px] resize-none bg-white"
+                  />
+                  <Button 
+                    onClick={parseBatchInput}
+                    className="bg-blue-500 hover:bg-blue-600 h-auto px-4"
+                  >
+                    <Wand2 className="w-4 h-4 mr-1" />
+                    解析
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="border-t border-gray-100 pt-4">
                 <Label>客户姓名 <span className="text-red-500">*</span></Label>
                 <Input
                   value={formData.customerName}
