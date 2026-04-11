@@ -113,7 +113,11 @@ export default function Orders() {
                 </thead>
                 <tbody>
                   {sortedOrders.map((order) => (
-                    <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr 
+                      key={order.id} 
+                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => navigate(`/orders/${order.id}`)}
+                    >
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <span className="font-mono font-medium">
