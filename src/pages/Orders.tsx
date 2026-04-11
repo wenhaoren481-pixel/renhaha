@@ -116,8 +116,12 @@ export default function Orders() {
                     <tr 
                       key={order.id || order.createdAt} 
                       className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => {
-                        if (order.id && order.id !== '未分配') {
+                      onClick={(e) => {
+                        // 确保点击的是行本身，而不是按钮
+                        const target = e.target as HTMLElement;
+                        if (target.closest('button')) return;
+                        
+                        if (order.id && order.id.startsWith('188')) {
                           navigate(`/orders/${order.id}`);
                         } else {
                           toast.error('该订单号无效，请删除后重新创建');
@@ -126,8 +130,9 @@ export default function Orders() {
                     >
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
-                          <span className={`font-mono font-medium ${!order.id || order.id === '未分配' ? 'text-red-500' : ''}`}>
-                            {order.id && order.id !== '未分配' ? order.id : '【订单号无效】'}{order.logo && order.id && order.id !== '未分配' ? `-${order.logo}` : ''}
+                          <span className={`font-mono font-medium ${!order.id || !order.id.startsWith('188') ? 'text-red-500' : ''}`}>
+                            {order.id && order.id.startsWith('188') ? order.id : '【订单号无效】'}
+                            {order.logo && order.id && order.id.startsWith('188') ? `-${order.logo}` : ''}
                           </span>
                           {isOverdue(order) && (
                             <span title="已超期"><AlertCircle className="w-4 h-4 text-red-500" /></span>
